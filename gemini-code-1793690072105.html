@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jom Kenali Peta Malaysia</title>
+
+  <!-- Google Fonts & MediaPipe Libraries via CDN -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <?!= include('Style'); ?>
+</head>
+<body>
+
+  <!-- Pengelip/Kursor Jari Maya untuk Webcam -->
+  <div id="virtual-cursor" class="virtual-cursor hidden">
+    <div class="cursor-ring"></div>
+    <div class="cursor-label">Jari Telunjuk</div>
+  </div>
+
+  <!-- CONTAINER UTAMA -->
+  <div class="app-container">
+
+    <!-- SKRIN 1: SKRIN UTAMA / PENDAFTARAN -->
+    <div id="welcome-screen" class="screen active">
+      <div class="welcome-card">
+        <h1 class="game-title">🇲🇾 JOM KENALI PETA MALAYSIA 🇲🇾</h1>
+        <h3 class="game-subtitle">Cabaran Puzzle Negeri & Wilayah Persekutuan</h3>
+
+        <div class="form-group">
+          <label for="player-name">Nama Pemain:</label>
+          <input type="text" id="player-name" placeholder="Masukkan nama anda..." maxlength="25">
+        </div>
+
+        <div class="form-group">
+          <label for="player-class">Kelas / Sekolah:</label>
+          <input type="text" id="player-class" placeholder="Cth: 4 Bestari / SK Seri Permai" maxlength="25">
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-start" onclick="startGame()">▶ MULA PERMAINAN</button>
+          <button class="btn btn-info" onclick="openModal('howto-modal')">❓ CARA BERMAIN</button>
+          <button class="btn btn-leaderboard" onclick="showLeaderboard()">🏆 REKOD PEMAIN</button>
+        </div>
+
+        <div class="webcam-status-box" id="webcam-status">
+          🎥 Mengesan Webcam... Menyokong pergerakan jari & tetikus.
+        </div>
+      </div>
+    </div>
+
+    <!-- SKRIN 2: PAPARAN PERMAINAN PERKEMBANGAN -->
+    <div id="game-screen" class="screen">
+      
+      <!-- HEADER DASHBOARD -->
+      <div class="game-header">
+        <div class="player-info-box">
+          <span id="display-player-name">Pemain</span> (<span id="display-player-class">Kelas</span>)
+        </div>
+
+        <div class="stats-box">
+          <div class="stat-item">
+            <span class="stat-label">SKOR:</span>
+            <span id="score-display" class="stat-value">0</span>
+          </div>
+
+          <div class="stat-item">
+            <span class="stat-label">NYAWA:</span>
+            <div id="lives-display" class="lives-container">
+              <span class="heart">❤️</span>
+              <span class="heart">❤️</span>
+              <span class="heart">❤️</span>
+            </div>
+          </div>
+
+          <div class="stat-item">
+            <span class="stat-label">MASA:</span>
+            <span id="timer-display" class="stat-value">00:00</span>
+          </div>
+        </div>
+
+        <button class="btn-small btn-danger" onclick="quitGame()">✖ KELUAR</button>
+      </div>
+
+      <!-- KANDUNGAN UTAMA PERMAINAN -->
+      <div class="game-body">
+        
+        <!-- SIDEBAR KIRI: WEBCAM FEED & BEKAS PUZZLE -->
+        <div class="sidebar">
+          <div class="webcam-container">
+            <video id="webcam-video" playsinline></video>
+            <canvas id="webcam-canvas"></canvas>
+            <div class="webcam-overlay" id="webcam-overlay-text">Kamera Aktif</div>
+          </div>
+
+          <div class="instruction-banner" id="game-instruction">
+            👉 Gunakan <b>jari telunjuk</b> untuk menunjuk dan rapatkan <b>ibu jari</b> (Pinch) untuk menyeret puzzle!
+          </div>
+
+          <div class="puzzle-tray-container">
+            <h4>Kepingan Puzzle Negeri (16)</h4>
+            <div id="puzzle-tray" class="puzzle-tray">
+              <!-- Kad Puzzle Akan Dijana Secara Dinamik -->
+            </div>
+          </div>
+        </div>
+
+        <!-- KAWASAN PETA MALAYSIA (SVG GEOGRAFI SEBENAR + DROPTARGET) -->
+        <div class="map-container">
+          <svg id="malaysia-map-svg" viewBox="0 0 1000 550" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+                <feDropShadow dx="2" dy="3" stdDeviation="2" flood-color="#000000" flood-opacity="0.3"/>
+              </filter>
+            </defs>
+
+            <!-- LATAR BELAKANG LAUT -->
+            <rect width="1000" height="550" fill="#e0f2fe" rx="15" />
+            <text x="500" y="30" class="svg-map-title">PETA GEOGRAFI MALAYSIA</text>
+            <text x="230" y="490" class="svg-region-label">SEMENANJUNG MALAYSIA</text>
+            <text x="730" y="490" class="svg-region-label">SABAH, SARAWAK & LABUAN</text>
+
+            <!-- GEOMETRI PETA SEMENANJUNG MALAYSIA -->
+            <g id="semenanjung-group">
+              <!-- Perlis -->
+              <path class="drop-zone" data-state="Perlis" d="M 130 80 L 150 75 L 155 95 L 135 100 Z" />
+              <!-- Kedah -->
+              <path class="drop-zone" data-state="Kedah" d="M 125 100 L 160 95 L 180 135 L 140 150 L 120 120 Z" />
+              <!-- Pulau Pinang -->
+              <path class="drop-zone" data-state="Pulau Pinang" d="M 105 145 L 125 145 L 125 165 L 105 165 Z" />
+              <!-- Perak -->
+              <path class="drop-zone" data-state="Perak" d="M 135 155 L 185 140 L 210 200 L 160 225 L 130 185 Z" />
+              <!-- Kelantan -->
+              <path class="drop-zone" data-state="Kelantan" d="M 185 135 L 240 125 L 255 190 L 205 195 Z" />
+              <!-- Terengganu -->
+              <path class="drop-zone" data-state="Terengganu" d="M 245 130 L 290 175 L 265 230 L 245 190 Z" />
+              <!-- Pahang -->
+              <path class="drop-zone" data-state="Pahang" d="M 205 200 L 270 195 L 305 270 L 225 300 L 195 240 Z" />
+              <!-- Selangor -->
+              <path class="drop-zone" data-state="Selangor" d="M 155 230 L 195 230 L 200 280 L 165 285 Z" />
+              <!-- Negeri Sembilan -->
+              <path class="drop-zone" data-state="Negeri Sembilan" d="M 200 285 L 235 280 L 240 310 L 205 315 Z" />
+              <!-- Melaka -->
+              <path class="drop-zone" data-state="Melaka" d="M 205 318 L 235 313 L 235 333 L 210 338 Z" />
+              <!-- Johor -->
+              <path class="drop-zone" data-state="Johor" d="M 235 310 L 285 285 L 320 340 L 260 380 L 230 340 Z" />
+            </g>
+
+            <!-- GEOMETRI PETA MALAYSIA TIMUR (SARAWAK & SABAH) -->
+            <g id="borneo-group">
+              <!-- Sarawak -->
+              <path class="drop-zone" data-state="Sarawak" d="M 520 340 L 600 290 L 680 270 L 740 310 L 710 360 L 600 375 L 530 400 Z" />
+              <!-- Sabah -->
+              <path class="drop-zone" data-state="Sabah" d="M 745 265 L 820 180 L 880 210 L 890 270 L 810 300 L 745 285 Z" />
+            </g>
+
+            <!-- INSET TARGET KAWASAN KECIL & WILAYAH PERSEKUTUAN -->
+            <g id="insets-group">
+              <!-- WP Kuala Lumpur -->
+              <rect class="drop-zone inset-box" data-state="Kuala Lumpur" x="110" y="320" width="75" height="40" rx="6"/>
+              <line x1="175" y1="260" x2="147" y2="320" class="inset-connector" />
+
+              <!-- WP Putrajaya -->
+              <rect class="drop-zone inset-box" data-state="Putrajaya" x="110" y="380" width="75" height="40" rx="6"/>
+              <line x1="185" y1="275" x2="147" y2="380" class="inset-connector" />
+
+              <!-- WP Labuan -->
+              <rect class="drop-zone inset-box" data-state="Labuan" x="720" y="160" width="75" height="40" rx="6"/>
+              <line x1="745" y1="260" x2="757" y2="200" class="inset-connector" />
+            </g>
+
+            <!-- LABEL TEKS SASARAN LOKASI -->
+            <g id="map-labels">
+              <text x="142" y="90" class="map-target-label">PLS</text>
+              <text x="148" y="125" class="map-target-label">KDH</text>
+              <text x="115" y="158" class="map-target-label">PNG</text>
+              <text x="165" y="185" class="map-target-label">PRK</text>
+              <text x="215" y="165" class="map-target-label">KTN</text>
+              <text x="260" y="180" class="map-target-label">TRG</text>
+              <text x="245" y="250" class="map-target-label">PHG</text>
+              <text x="175" y="258" class="map-target-label">SGR</text>
+              <text x="218" y="298" class="map-target-label">NSN</text>
+              <text x="218" y="328" class="map-target-label">MLK</text>
+              <text x="265" y="340" class="map-target-label">JHR</text>
+              <text x="630" y="335" class="map-target-label">SARAWAK</text>
+              <text x="815" y="245" class="map-target-label">SABAH</text>
+              
+              <!-- Inset Labels -->
+              <text x="147" y="344" class="inset-target-label">WP KL</text>
+              <text x="147" y="404" class="inset-target-label">WP Putrajaya</text>
+              <text x="757" y="184" class="inset-target-label">WP Labuan</text>
+            </g>
+          </svg>
+
+          <!-- Maklum Balas Visual Pop-up -->
+          <div id="feedback-toast" class="feedback-toast hidden">BETUL! TAHNIAH!</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL: CARA BERMAIN -->
+  <div id="howto-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>🎮 CARA BERMAIN</h2>
+      <div class="modal-body">
+        <ol>
+          <li><b>Tetapkan Kamera / Tetikus:</b> Benarkan kebenaran webcam apabila diminta. Nyalaan lampu indikator menunjukkan kamera sedia.</li>
+          <li><b>Pilih Kepingan Puzzle:</b> Gunakan <b>jari telunjuk</b> di hadapan webcam atau klik guna <b>tetikus</b> pada nama negeri.</li>
+          <li><b>Genggam & Seret (Pinch):</b> Rapatkan ibu jari dan jari telunjuk anda (gerakan Pinch) untuk memegang puzzle, lalu seret ke kedudukan peta yang betul.</li>
+          <li><b>Lepaskan Jawapan:</b> Buka semula genggaman jari (Release Pinch) di atas lokasi sasaran pada peta.</li>
+          <li><b>Markah & Nyawa:</b> Setiap jawapan betul memberi <b>+10 Markah</b>. Jawapan salah menolak <b>1 Nyawa</b> (Jumlah 3 Nyawa).</li>
+          <li><b>Bonus Masa:</b> Lengkapkan semua 16 lokasi untuk mendapat <b>+50 Markah Bonus!</b></li>
+        </ol>
+      </div>
+      <button class="btn btn-start" onclick="closeModal('howto-modal')">FAHAM, MARI BERMAIN!</button>
+    </div>
+  </div>
+
+  <!-- MODAL: REKOD PEMAIN (LEADERBOARD) -->
+  <div id="leaderboard-modal" class="modal-overlay hidden">
+    <div class="modal-box modal-large">
+      <h2>🏆 CARTA REKOD PEMAIN TERTINGGI</h2>
+      <div class="modal-body">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>Ked.</th>
+              <th>Nama Pemain</th>
+              <th>Kelas</th>
+              <th>Skor</th>
+              <th>Masa</th>
+              <th>Baki Nyawa</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-tbody">
+            <tr><td colspan="6">Muat turun data rekod...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button class="btn btn-danger" onclick="closeModal('leaderboard-modal')">TUTUP</button>
+    </div>
+  </div>
+
+  <!-- MODAL: TAMAT PERMAINAN / TAHNIAH -->
+  <div id="gameover-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2 id="gameover-title">GAME OVER</h2>
+      <div class="modal-body text-center">
+        <div id="gameover-status-icon" style="font-size: 50px;">😢</div>
+        <p id="gameover-message">Nyawa anda telah habis!</p>
+        <div class="final-score-card">
+          <div>Jumlah Skor Akhir: <b id="final-score">0</b></div>
+          <div>Masa Diberikan: <b id="final-time">00:00</b></div>
+        </div>
+        <p id="save-status-text" class="save-status">Menyimpan rekod ke Google Sheets...</p>
+      </div>
+      <div class="button-group">
+        <button class="btn btn-start" onclick="restartGame()">🔄 MAIN SEMULA</button>
+        <button class="btn btn-leaderboard" onclick="showLeaderboardFromEnd()">🏆 LIHAT REKOD</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEMUATKAN SKRIP LOGIK FRONTEND & TRACKING -->
+  <?!= include('HandTracking'); ?>
+  <?!= include('JavaScript'); ?>
+
+</body>
+</html>
